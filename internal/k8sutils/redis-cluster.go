@@ -35,7 +35,7 @@ type RedisClusterService struct {
 }
 
 // generateRedisClusterParams generates Redis cluster information
-func generateRedisClusterParams(ctx context.Context, cr *rcvb2.RedisCluster, replicas int32, externalConfig *string, params RedisClusterSTS) statefulSetParameters {
+func generateRedisClusterParams(ctx context.Context, cr *rcvb2.RedisCluster, replicas int32, externalConfig *string, params RedisClusterSTS, clusterNodeTimeout *int) statefulSetParameters {
 	var minreadyseconds int32 = 0
 	if cr.Spec.KubernetesConfig.MinReadySeconds != nil {
 		minreadyseconds = *cr.Spec.KubernetesConfig.MinReadySeconds
@@ -56,6 +56,7 @@ func generateRedisClusterParams(ctx context.Context, cr *rcvb2.RedisCluster, rep
 		IgnoreAnnotations:             cr.Spec.KubernetesConfig.IgnoreAnnotations,
 		HostNetwork:                   cr.Spec.HostNetwork,
 		MinReadySeconds:               minreadyseconds,
+		ClusterNodeTimeout:            cr.Spec.ClusterNodeTimeout,
 	}
 	if cr.Spec.RedisExporter != nil {
 		res.EnableMetrics = cr.Spec.RedisExporter.Enabled
@@ -229,10 +230,9 @@ func CreateRedisLeader(ctx context.Context, cr *rcvb2.RedisCluster, cl kubernete
 		TerminationGracePeriodSeconds: cr.Spec.RedisLeader.TerminationGracePeriodSeconds,
 		NodeSelector:                  cr.Spec.RedisLeader.NodeSelector,
 		TopologySpreadConstraints:     cr.Spec.RedisLeader.TopologySpreadConstraints,
-
-		Tolerations:    cr.Spec.RedisLeader.Tolerations,
-		ReadinessProbe: cr.Spec.RedisLeader.ReadinessProbe,
-		LivenessProbe:  cr.Spec.RedisLeader.LivenessProbe,
+		Tolerations:                   cr.Spec.RedisLeader.Tolerations,
+		ReadinessProbe:                cr.Spec.RedisLeader.ReadinessProbe,
+		LivenessProbe:                 cr.Spec.RedisLeader.LivenessProbe,
 	}
 	if cr.Spec.RedisLeader.RedisConfig != nil {
 		prop.ExternalConfig = cr.Spec.RedisLeader.RedisConfig.AdditionalRedisConfig
@@ -293,7 +293,7 @@ func (service RedisClusterSTS) CreateRedisClusterSetup(ctx context.Context, cr *
 		cl,
 		cr.GetNamespace(),
 		objectMetaInfo,
-		generateRedisClusterParams(ctx, cr, service.getReplicaCount(cr), service.ExternalConfig, service),
+		generateRedisClusterParams(ctx, cr, service.getReplicaCount(cr), service.ExternalConfig, service, cr.Spec.ClusterNodeTimeout),
 		redisClusterAsOwner(cr),
 		generateRedisClusterInitContainerParams(cr),
 		generateRedisClusterContainerParams(ctx, cl, cr, service.SecurityContext, service.ReadinessProbe, service.LivenessProbe, service.RedisStateFulType, service.Resources),

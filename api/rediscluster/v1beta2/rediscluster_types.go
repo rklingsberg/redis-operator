@@ -30,7 +30,10 @@ type RedisClusterSpec struct {
 	// +kubebuilder:default:=6379
 	Port *int `json:"port,omitempty"`
 	// +kubebuilder:default:=v7
-	ClusterVersion     *string                      `json:"clusterVersion,omitempty"`
+	ClusterVersion *string `json:"clusterVersion,omitempty"`
+	// ClusterNodeTimeout is the Redis cluster-node-timeout in milliseconds.
+	// +kubebuilder:default:=5000
+	ClusterNodeTimeout *int                         `json:"clusterNodeTimeout,omitempty"`
 	RedisConfig        *common.RedisConfig          `json:"redisConfig,omitempty"`
 	RedisLeader        RedisLeader                  `json:"redisLeader,omitempty"`
 	RedisFollower      RedisFollower                `json:"redisFollower,omitempty"`

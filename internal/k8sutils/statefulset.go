@@ -119,6 +119,7 @@ type statefulSetParameters struct {
 	IgnoreAnnotations             []string
 	HostNetwork                   bool
 	MinReadySeconds               int32
+	ClusterNodeTimeout            *int
 }
 
 // containerParameters will define container input params
@@ -295,6 +296,7 @@ func generateStatefulSetsDef(stsMeta metav1.ObjectMeta, params statefulSetParame
 						params.EnableMetrics,
 						params.ExternalConfig,
 						params.ClusterVersion,
+						params.ClusterNodeTimeout,
 						containerParams.AdditionalMountPath,
 						sidecars,
 					),
@@ -417,7 +419,10 @@ func createPVCTemplate(volumeName string, stsMeta metav1.ObjectMeta, storageSpec
 }
 
 // generateContainerDef generates container definition for Redis
-func generateContainerDef(name string, containerParams containerParameters, clusterMode, nodeConfVolume, enableMetrics bool, externalConfig, clusterVersion *string, mountpath []corev1.VolumeMount, sidecars []common.Sidecar) []corev1.Container {
+func generateContainerDef(name string, containerParams containerParameters, clusterMode, nodeConfVolume, enableMetrics bool, externalConfig, clusterVersion *string, clusterNodeTimeout *int, mountpath []corev1.VolumeMount, sidecars []common.Sidecar) []corev1.Container {
+	if clusterMode {
+		containerParams.Role = "cluster"
+	}
 	sentinelCntr := containerParams.Role == "sentinel"
 	enableTLS := containerParams.TLSConfig != nil
 	enableAuth := containerParams.EnabledPassword != nil && *containerParams.EnabledPassword
@@ -449,9 +454,27 @@ func generateContainerDef(name string, containerParams containerParameters, clus
 		if sentinelCntr {
 			containerDefinition[0].Command = []string{"redis-sentinel"}
 			containerDefinition[0].Args = []string{"/etc/redis/sentinel.conf"}
+		} else if clusterMode {
+			containerDefinition[0].Command = []string{"redis-server"}
+			containerDefinition[0].Args = []string{
+				"--cluster-enabled", "yes",
+				"--cluster-config-file", "/data/nodes.conf",
+				"--cluster-node-timeout", strconv.Itoa(*util.Coalesce(clusterNodeTimeout, ptr.To(5000))),
+				"--port",
+				strconv.Itoa(*util.Coalesce(containerParams.Port, ptr.To(6379))),
+			}
 		} else {
 			containerDefinition[0].Command = []string{"redis-server"}
 			containerDefinition[0].Args = []string{"/etc/redis/redis.conf"}
+		}
+	} else if clusterMode {
+		containerDefinition[0].Command = []string{"redis-server"}
+		containerDefinition[0].Args = []string{
+			"--cluster-enabled", "yes",
+			"--cluster-config-file", "/data/nodes.conf",
+			"--cluster-node-timeout", strconv.Itoa(*util.Coalesce(clusterNodeTimeout, ptr.To(5000))),
+			"--port",
+			strconv.Itoa(*util.Coalesce(containerParams.Port, ptr.To(6379))),
 		}
 	}
 

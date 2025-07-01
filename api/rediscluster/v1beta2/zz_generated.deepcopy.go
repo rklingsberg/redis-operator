@@ -121,6 +121,11 @@ func (in *RedisClusterSpec) DeepCopyInto(out *RedisClusterSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.ClusterNodeTimeout != nil {
+		in, out := &in.ClusterNodeTimeout, &out.ClusterNodeTimeout
+		*out = new(int)
+		**out = **in
+	}
 	if in.RedisConfig != nil {
 		in, out := &in.RedisConfig, &out.RedisConfig
 		*out = new(commonv1beta2.RedisConfig)
